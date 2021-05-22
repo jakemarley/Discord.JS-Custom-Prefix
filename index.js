@@ -1,50 +1,57 @@
-const Discord = require('discord.js');
-const client = new Discord.Client({
-    partials: ['MESSAGE', 'CHANNEL', 'REACTION']
-});
-const {
-    loadCommands
-} = require('./utils/loadCommands');
-const mongoose = require('mongoose');
-//Make sure to require this model in your message event or index.js if you use message event on there. in this case im going to require it here
-const prefix = require('./models/prefix');
+c const Discord = require("discord.js"); // Defining the Discord.JS
+  const client = new Discord.Client(); // Defining Client
+  const { token } = require("./config.json"); // Defining the Token
+  const { readdirSync } = require("fs"); //  Defining the Sync
+  const { join } = require("path"); // Defining the Join
+  const {prefix} = require ('./config.json');
+  const fetch = require('node-fetch');
+  // End of Const's 
 
-mongoose.connect('MONGODB_URL', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
-client.login("BOT_TOKEN");
 
-client.commands = new Discord.Collection();
-client.aliases = new Discord.Collection();
 
-loadCommands(client);
+const activities_list = [
+  "Version 2.0.0",
+  "Watching Servers",
+  "PREFIX *",
+  
+];
 
-client.on('message', async (message) => {
-    if (message.author.bot) return;
 
-    //Getting the data from the model
-    const data = await prefix.findOne({
-        GuildID: message.guild.id
-    });
+setInterval(() => {
+  const index = Math.floor(Math.random() * (activities_list.length - 0) + 0); // generates a random number between 1 and the length of the activities array list (in this case 5).
+  client.user.setActivity(activities_list[index]); // sets bot's activities to one of the phrases in the arraylist.
+}, 10000); // Runs this every 10 seconds.
 
-    const messageArray = message.content.split(' ');
-    const cmd = messageArray[0];
-    const args = messageArray.slice(1);
+  client.commands = new Discord.Collection();
 
-    //If there was a data, use the database prefix BUT if there is no data, use the default prefix which you have to set!
-    if(data) {
-        const prefix = data.Prefix;
+      const commandFiles = readdirSync(join(__dirname, "commands")).filter((file) => // Defining the Commands folder.
+      file.endsWith(".js") // This means only .js files will work with this bot
+  );
 
-        if (!message.content.startsWith(prefix)) return;
-        const commandfile = client.commands.get(cmd.slice(prefix.length)) || bot.commands.get(bot.aliases.get(cmd.slice(prefix.length)));
-        commandfile.run(client, message, args);
-    } else if (!data) {
-        //set the default prefix here
-        const prefix = "!";
-        
-        if (!message.content.startsWith(prefix)) return;
-        const commandfile = client.commands.get(cmd.slice(prefix.length)) || bot.commands.get(bot.aliases.get(cmd.slice(prefix.length)));
-        commandfile.run(client, message, args);
+  for (const file of commandFiles) {
+    const command = require(join(__dirname, "commands", `${file}`)); // The "Commands" name, can be changed to anything, all it means is the folder name with the .js files can be different.
+
+    client.commands.set(command.name, command);
+  }
+
+  client.on("error", console.error);
+
+  client.on("ready", () => {
+   console.log("Bot is online")
+   return
+  });
+
+    // Command Handeler
+  client.on("message", async (message) => {
+    if (message.author.bot) return
+    if (message.channel.type === "dm") return
+    if (message.content.startsWith(prefix)) {
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+    if (!client.commands.has(command)) return
+    try {
+    client.commands.get(command).run(client, message, args);
+    } catch (error) {
+    console.error(error);
     }
-})
+  }
